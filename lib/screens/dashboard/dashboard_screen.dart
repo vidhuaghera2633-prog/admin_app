@@ -20,9 +20,47 @@ class DashboardScreen extends StatelessWidget {
     final bp = _DashboardBreakpoints.fromWidth(MediaQuery.sizeOf(context).width);
     return Column(
       children: [
-        const HeaderBar(
+        HeaderBar(
           title: 'Dashboard',
           subtitle: "Welcome back! Here's what's happening today.",
+          actions: ElevatedButton.icon(
+            icon: const Icon(Icons.bolt, size: 16),
+            label: const Text('Simulate Complaint'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            ),
+            onPressed: () async {
+              final id = 'test_${DateTime.now().millisecondsSinceEpoch}';
+              final newComplaint = Complaint(
+                id: id,
+                ticketNo: 'TKT-SIM-${id.substring(id.length - 4)}',
+                customer: Customer(
+                  name: 'Jane Doe (Simulated)',
+                  phone: '+1 555-0199',
+                  email: 'jane.doe@example.com',
+                ),
+                device: Device(
+                  type: 'AC',
+                  brand: 'Carrier',
+                  model: 'WeatherMaker',
+                  serial: 'SIM12345',
+                  purchaseDate: '',
+                  warrantyExpiry: '',
+                ),
+                issue: 'Water leakage from the indoor unit',
+                description: 'AC is leaking water continuously while running.',
+                status: ComplaintStatus.pending,
+                priority: Priority.high,
+                district: 'West District',
+                address: '100 Simulated Street',
+                createdAt: DateTime.now(),
+                updatedAt: DateTime.now(),
+              );
+
+              await context.read<ComplaintsProvider>().addComplaint(newComplaint);
+            },
+          ),
         ),
         Expanded(
           child: SingleChildScrollView(
