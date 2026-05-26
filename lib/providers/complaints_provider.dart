@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:go_router/go_router.dart';
 import '../models/complaint.dart';
 import '../data/mock_data.dart';
+import '../router.dart';
+import '../theme/app_theme.dart';
 
 class ComplaintsProvider extends ChangeNotifier {
   List<Complaint> _complaints = [];
@@ -21,7 +24,7 @@ class ComplaintsProvider extends ChangeNotifier {
         // Optional: Seed mock data if collection is empty
         await _seedMockData();
       } else {
-        _complaints = snapshot.docs.map((doc) {
+        final newComplaints = snapshot.docs.map((doc) {
           final data = Map<String, dynamic>.from(doc.data());
           // Ensure the document ID is always set in the model
           if (data['id'] == null || data['id'].toString().isEmpty) {
@@ -29,10 +32,111 @@ class ComplaintsProvider extends ChangeNotifier {
           }
           return Complaint.fromMap(data);
         }).toList();
+
+        if (!_isLoading) {
+          final existingIds = _complaints.map((c) => c.id).toSet();
+          for (var nc in newComplaints) {
+            if (!existingIds.contains(nc.id)) {
+              _showNewComplaintNotification(nc);
+            }
+          }
+        }
+
+        _complaints = newComplaints;
         _isLoading = false;
         notifyListeners();
       }
     });
+  }
+
+  void _showNewComplaintNotification(Complaint complaint) {
+    final context = rootNavigatorKey.currentContext;
+    if (context == null) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 8),
+        content: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.primary.withOpacity(0.5), width: 1.5),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.amber50.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.notifications_active, color: AppColors.warning, size: 24),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '🔔 New Complaint Arrived!',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Ticket: ${complaint.ticketNo.isEmpty ? complaint.id.substring(0, 6) : complaint.ticketNo}',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${complaint.customer.name} - ${complaint.issue}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  GoRouter.of(context).go('/app/complaints/${complaint.id}');
+                },
+                child: const Text('VIEW'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _seedMockData() async {
