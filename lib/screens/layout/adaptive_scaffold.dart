@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/notification_center.dart';
 import 'sidebar.dart';
 
 class AdaptiveScaffold extends StatelessWidget {
@@ -96,13 +97,7 @@ class _MobileHeaderState extends State<_MobileHeader> {
           const SizedBox(width: 4),
           const Text('TechServe Admin', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           const Spacer(),
-          IconButton(
-            icon: const Icon(Icons.notifications_none_rounded, size: 22),
-            onPressed: () {
-              // TODO: Implement notification drawer or dialog
-            },
-            tooltip: 'Notifications',
-          ),
+          const NotificationBell(),
           const SizedBox(width: 2),
           Container(
             width: 32, height: 32,

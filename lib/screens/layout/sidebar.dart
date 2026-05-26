@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/notification_center.dart';
 
 class _NavItem {
   final String label, route;
@@ -56,8 +57,11 @@ class Sidebar extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (onClose != null)
+                const NotificationBell(),
+                if (onClose != null) ...[
+                  const SizedBox(width: 4),
                   IconButton(icon: const Icon(Icons.close, size: 20), onPressed: onClose, padding: EdgeInsets.zero),
+                ],
               ],
             ),
           ),

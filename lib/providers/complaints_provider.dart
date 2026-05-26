@@ -1,19 +1,47 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:js' as js;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import '../models/complaint.dart';
 import '../data/mock_data.dart';
 import '../router.dart';
-import '../theme/app_theme.dart';
+import '../widgets/overlay_notification.dart';
+
 
 class ComplaintsProvider extends ChangeNotifier {
   List<Complaint> _complaints = [];
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   bool _isLoading = true;
+  final Set<String> _unreadComplaintIds = {};
+  final Map<String, int> _lastMessageCounts = {};
 
   ComplaintsProvider() {
     _listenToComplaints();
+    // On web, request browser notification permission early so we can show native notifications
+    if (kIsWeb) {
+      try {
+        js.context.callMethod('requestNotificationPermission');
+      } catch (e) {
+        debugPrint('requestNotificationPermission JS call failed: $e');
+      }
+    }
   }
+
+  Set<String> get unreadComplaintIds => _unreadComplaintIds;
+  int get unreadCount => _unreadComplaintIds.length;
+
+  void markAllAsRead() {
+    _unreadComplaintIds.clear();
+    notifyListeners();
+  }
+
+  void markAsRead(String id) {
+    if (_unreadComplaintIds.remove(id)) {
+      notifyListeners();
+    }
+  }
+
 
   List<Complaint> get complaints => _complaints;
   bool get isLoading => _isLoading;
@@ -40,103 +68,106 @@ class ComplaintsProvider extends ChangeNotifier {
               _showNewComplaintNotification(nc);
             }
           }
+
+          for (var nc in newComplaints) {
+            final previousMessageCount = _lastMessageCounts[nc.id];
+            final currentMessageCount = nc.messages.length;
+            final hasNewCustomerMessage = previousMessageCount != null &&
+                currentMessageCount > previousMessageCount &&
+                nc.messages.isNotEmpty &&
+                nc.messages.last.senderRole != 'admin';
+
+            if (hasNewCustomerMessage) {
+              _showCustomerChatNotification(nc, nc.messages.last);
+            }
+          }
         }
 
         _complaints = newComplaints;
+        for (final complaint in newComplaints) {
+          _lastMessageCounts[complaint.id] = complaint.messages.length;
+        }
         _isLoading = false;
         notifyListeners();
       }
     });
   }
 
+  void _playChime() {
+    if (kIsWeb) {
+      try {
+        js.context.callMethod('playNotificationSound');
+      } catch (e) {
+        debugPrint('Error playing audio via JS: $e');
+      }
+    }
+  }
+
   void _showNewComplaintNotification(Complaint complaint) {
+    _unreadComplaintIds.add(complaint.id);
+    _playChime();
+    notifyListeners();
+
     final context = rootNavigatorKey.currentContext;
     if (context == null) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 8),
-        content: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E293B),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.primary.withOpacity(0.5), width: 1.5),
-            boxShadow: const [
-              BoxShadow(
-                color: Colors.black26,
-                blurRadius: 12,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.amber50.withOpacity(0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.notifications_active, color: AppColors.warning, size: 24),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '🔔 New Complaint Arrived!',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'Ticket: ${complaint.ticketNo.isEmpty ? complaint.id.substring(0, 6) : complaint.ticketNo}',
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${complaint.customer.name} - ${complaint.issue}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              TextButton(
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                ),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                  GoRouter.of(context).go('/app/complaints/${complaint.id}');
-                },
-                child: const Text('VIEW'),
-              ),
-            ],
-          ),
-        ),
-      ),
+    OverlayNotification.show(
+      context: context,
+      complaint: complaint,
+      onView: () {
+        markAsRead(complaint.id);
+        GoRouter.of(context).go('/app/complaints/${complaint.id}');
+      },
     );
+
+    // Also show a browser native notification when running on web
+    if (kIsWeb) {
+      try {
+        js.context.callMethod('showBrowserNotification', [
+          'New complaint: ${complaint.ticketNo.isEmpty ? complaint.issue : complaint.ticketNo}',
+          js.JsObject.jsify({
+            'body': complaint.issue,
+            'icon': 'favicon.png',
+            'data': {'url': '/app/complaints/${complaint.id}'}
+          })
+        ]);
+      } catch (e) {
+        debugPrint('Browser notification JS call failed: $e');
+      }
+    }
+  }
+
+  void _showCustomerChatNotification(Complaint complaint, ComplaintMessage message) {
+    _unreadComplaintIds.add(complaint.id);
+    _playChime();
+    notifyListeners();
+
+    final context = rootNavigatorKey.currentContext;
+    if (context != null) {
+      OverlayNotification.show(
+        context: context,
+        complaint: complaint,
+        onView: () {
+          markAsRead(complaint.id);
+          GoRouter.of(context).go('/app/complaints/${complaint.id}');
+        },
+      );
+    }
+
+    if (kIsWeb) {
+      try {
+        js.context.callMethod('showBrowserNotification', [
+          'New customer message: ${complaint.ticketNo.isEmpty ? complaint.issue : complaint.ticketNo}',
+          js.JsObject.jsify({
+            'body': message.message,
+            'icon': 'favicon.png',
+            'data': {'url': '/app/complaints/${complaint.id}'}
+          })
+        ]);
+      } catch (e) {
+        debugPrint('Browser notification JS call failed: $e');
+      }
+    }
   }
 
   Future<void> _seedMockData() async {
@@ -192,12 +223,33 @@ class ComplaintsProvider extends ChangeNotifier {
         ..add(LogEntry(time: DateTime.now(), action: 'Complaint rejected: $reason', by: 'Admin'));
 
       await _db.collection('complaints').doc(id).update({
-        'status': 'Rejected', // Use capitalized to match Customer App expectation
+        'status': ComplaintStatus.rejected.name,
         'updatedAt': Timestamp.now(),
         'notes': updatedNotes,
         'messages': FieldValue.arrayUnion([newMessage.toMap()]),
         'logs': updatedLogs.map((l) => l.toMap()).toList(),
       });
+
+      // Mark as unread for admin UI and play notification
+      _unreadComplaintIds.add(id);
+      _playChime();
+      notifyListeners();
+
+      // Show browser native notification if available
+      if (kIsWeb) {
+        try {
+          js.context.callMethod('showBrowserNotification', [
+            'Complaint rejected: ${c.ticketNo.isEmpty ? c.issue : c.ticketNo}',
+            js.JsObject.jsify({
+              'body': 'Reason: $reason',
+              'icon': 'favicon.png',
+              'data': {'url': '/app/complaints/$id'}
+            })
+          ]);
+        } catch (e) {
+          debugPrint('Browser notification JS call failed: $e');
+        }
+      }
     }
   }
 
