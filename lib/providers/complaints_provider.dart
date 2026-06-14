@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'dart:js' as js;
+import '../core/utils/js_helper.dart' as js_helper;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import '../models/complaint.dart';
@@ -18,13 +18,8 @@ class ComplaintsProvider extends ChangeNotifier {
 
   ComplaintsProvider() {
     _listenToComplaints();
-    // On web, request browser notification permission early so we can show native notifications
     if (kIsWeb) {
-      try {
-        js.context.callMethod('requestNotificationPermission');
-      } catch (e) {
-        debugPrint('requestNotificationPermission JS call failed: $e');
-      }
+      js_helper.requestNotificationPermission();
     }
   }
 
@@ -95,11 +90,7 @@ class ComplaintsProvider extends ChangeNotifier {
 
   void _playChime() {
     if (kIsWeb) {
-      try {
-        js.context.callMethod('playNotificationSound');
-      } catch (e) {
-        debugPrint('Error playing audio via JS: $e');
-      }
+      js_helper.playNotificationSound();
     }
   }
 
@@ -122,18 +113,11 @@ class ComplaintsProvider extends ChangeNotifier {
 
     // Also show a browser native notification when running on web
     if (kIsWeb) {
-      try {
-        js.context.callMethod('showBrowserNotification', [
-          'New complaint: ${complaint.ticketNo.isEmpty ? complaint.issue : complaint.ticketNo}',
-          js.JsObject.jsify({
-            'body': complaint.issue,
-            'icon': 'favicon.png',
-            'data': {'url': '/app/complaints/${complaint.id}'}
-          })
-        ]);
-      } catch (e) {
-        debugPrint('Browser notification JS call failed: $e');
-      }
+      js_helper.showBrowserNotification(
+        'New complaint: ${complaint.ticketNo.isEmpty ? complaint.issue : complaint.ticketNo}',
+        complaint.issue,
+        '/app/complaints/${complaint.id}',
+      );
     }
   }
 
@@ -155,18 +139,11 @@ class ComplaintsProvider extends ChangeNotifier {
     }
 
     if (kIsWeb) {
-      try {
-        js.context.callMethod('showBrowserNotification', [
-          'New customer message: ${complaint.ticketNo.isEmpty ? complaint.issue : complaint.ticketNo}',
-          js.JsObject.jsify({
-            'body': message.message,
-            'icon': 'favicon.png',
-            'data': {'url': '/app/complaints/${complaint.id}'}
-          })
-        ]);
-      } catch (e) {
-        debugPrint('Browser notification JS call failed: $e');
-      }
+      js_helper.showBrowserNotification(
+        'New customer message: ${complaint.ticketNo.isEmpty ? complaint.issue : complaint.ticketNo}',
+        message.message,
+        '/app/complaints/${complaint.id}',
+      );
     }
   }
 
@@ -237,18 +214,11 @@ class ComplaintsProvider extends ChangeNotifier {
 
       // Show browser native notification if available
       if (kIsWeb) {
-        try {
-          js.context.callMethod('showBrowserNotification', [
-            'Complaint rejected: ${c.ticketNo.isEmpty ? c.issue : c.ticketNo}',
-            js.JsObject.jsify({
-              'body': 'Reason: $reason',
-              'icon': 'favicon.png',
-              'data': {'url': '/app/complaints/$id'}
-            })
-          ]);
-        } catch (e) {
-          debugPrint('Browser notification JS call failed: $e');
-        }
+        js_helper.showBrowserNotification(
+          'Complaint rejected: ${c.ticketNo.isEmpty ? c.issue : c.ticketNo}',
+          'Reason: $reason',
+          '/app/complaints/$id',
+        );
       }
     }
   }
