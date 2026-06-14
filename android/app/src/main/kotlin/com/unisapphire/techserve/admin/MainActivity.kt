@@ -1,4 +1,4 @@
-package com.example.techserve_admin
+package com.unisapphire.techserve.admin
 
 import io.flutter.embedding.android.FlutterActivity
 
