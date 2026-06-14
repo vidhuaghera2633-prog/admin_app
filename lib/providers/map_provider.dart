@@ -145,10 +145,22 @@ class MapProvider extends ChangeNotifier {
     }).toList();
 
     _customerLocations = _complaints.map((c) {
-      final base = _districtCoords[c.district] ??
-          const LatLng(23.5880, 58.3829);
+      LatLng? parsedLatLng;
+      final regExp = RegExp(r'GPS:\s*(\-?\d+\.\d+),\s*(\-?\d+\.\d+)');
+      final match = regExp.firstMatch(c.address);
+      if (match != null) {
+        parsedLatLng = LatLng(double.parse(match.group(1)!), double.parse(match.group(2)!));
+      } else {
+        final regExpDirect = RegExp(r'(\-?\d+\.\d+),\s*(\-?\d+\.\d+)');
+        final matchDirect = regExpDirect.firstMatch(c.address);
+        if (matchDirect != null) {
+          parsedLatLng = LatLng(double.parse(matchDirect.group(1)!), double.parse(matchDirect.group(2)!));
+        }
+      }
+
+      final base = parsedLatLng ?? _districtCoords[c.district] ?? const LatLng(23.5880, 58.3829);
       
-      final offset = LatLng(
+      final position = parsedLatLng ?? LatLng(
         base.latitude + (_rand.nextDouble() - 0.5) * 0.04,
         base.longitude + (_rand.nextDouble() - 0.5) * 0.04,
       );
@@ -157,7 +169,7 @@ class MapProvider extends ChangeNotifier {
         complaintId: c.id,
         ticketNo: c.ticketNo,
         customerName: c.customer.name,
-        position: offset,
+        position: position,
         issue: c.issue,
         district: c.district,
         status: c.status.name,

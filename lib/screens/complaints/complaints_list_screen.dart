@@ -24,11 +24,10 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
           if (!c.ticketNo.toLowerCase().contains(q) &&
               !c.customer.name.toLowerCase().contains(q) &&
               !c.issue.toLowerCase().contains(q) &&
-              !c.district.toLowerCase().contains(q)) return false;
+              !c.address.toLowerCase().contains(q)) return false;
         }
         if (_statusFilter != null && c.status != _statusFilter) return false;
         if (_priorityFilter != null && c.priority != _priorityFilter) return false;
-        if (_districtFilter != null && c.district != _districtFilter) return false;
         return true;
       }).toList();
       if (_sortCol == 'date') {
@@ -53,7 +52,6 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
   String _search = '';
   ComplaintStatus? _statusFilter;
   Priority? _priorityFilter;
-  String? _districtFilter;
   String? _sortCol;
   bool _sortAsc = true;
 
@@ -75,12 +73,9 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
                     search: _search,
                     statusFilter: _statusFilter,
                     priorityFilter: _priorityFilter,
-                    districtFilter: _districtFilter,
-                    districts: all.map((c) => c.district).toSet().toList(),
                     onSearch: (v) => setState(() => _search = v),
                     onStatus: (v) => setState(() => _statusFilter = v),
                     onPriority: (v) => setState(() => _priorityFilter = v),
-                    onDistrict: (v) => setState(() => _districtFilter = v),
                   ),
                   const SizedBox(height: 16),
                   _StatusChips(all: all, current: _statusFilter, onTap: (s) => setState(() => _statusFilter = s)),
@@ -254,16 +249,12 @@ class _Filters extends StatelessWidget {
   final String search;
   final ComplaintStatus? statusFilter;
   final Priority? priorityFilter;
-  final String? districtFilter;
-  final List<String> districts;
   final ValueChanged<String> onSearch;
   final ValueChanged<ComplaintStatus?> onStatus;
   final ValueChanged<Priority?> onPriority;
-  final ValueChanged<String?> onDistrict;
 
   const _Filters({required this.search, required this.statusFilter, required this.priorityFilter,
-    required this.districtFilter, required this.districts, required this.onSearch,
-    required this.onStatus, required this.onPriority, required this.onDistrict});
+    required this.onSearch, required this.onStatus, required this.onPriority});
 
   @override
   Widget build(BuildContext context) {
@@ -295,10 +286,6 @@ class _Filters extends StatelessWidget {
                 [null, Priority.critical, Priority.high, Priority.medium, Priority.low],
                 (v) => v == null ? 'All' : v.name[0].toUpperCase() + v.name.substring(1),
                 onPriority),
-              _dropdown<String?>('District', districtFilter,
-                [null, ...districts],
-                (v) => v ?? 'All',
-                onDistrict),
             ],
           ),
           const SizedBox(height: 12),
@@ -430,11 +417,13 @@ class _ComplaintsTable extends StatelessWidget {
           child: DataTable(
           headingRowColor: WidgetStateProperty.all(AppColors.gray50),
           horizontalMargin: 20, columnSpacing: 20,
+          dataRowMinHeight: 60,
+          dataRowMaxHeight: 60,
           columns: [
             const DataColumn(label: Text('Ticket', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
             const DataColumn(label: Text('Customer', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
             const DataColumn(label: Text('Device & Issue', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
-            const DataColumn(label: Text('District', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
+            const DataColumn(label: Text('Address', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
             const DataColumn(label: Text('Priority', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
             const DataColumn(label: Text('Status', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
             const DataColumn(label: Text('Assigned', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
@@ -493,11 +482,43 @@ class _ComplaintsTable extends StatelessWidget {
           Text(c.issue.isEmpty ? 'No issue described' : c.issue, 
             style: const TextStyle(fontSize: 11, color: AppColors.gray500), overflow: TextOverflow.ellipsis),
         ]))),
-        DataCell(Row(children: [
-          const Icon(Icons.location_on_outlined, size: 12, color: AppColors.gray400),
-          const SizedBox(width: 4),
-          Text(c.district.isEmpty ? 'No District' : c.district, style: const TextStyle(fontSize: 12)),
-        ])),
+        DataCell(SizedBox(
+          width: 220,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.gps_fixed, size: 12, color: AppColors.primary),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      _formatCoordinates(c.address),
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.gray700),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  const Icon(Icons.location_on_outlined, size: 12, color: AppColors.gray400),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      _formatAddress(c.address),
+                      style: const TextStyle(fontSize: 11, color: AppColors.gray500),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        )),
         DataCell(PriorityBadge(priority: c.priority)),
         DataCell(StatusBadge(status: c.status)),
         DataCell(assignedTech != null
@@ -561,5 +582,35 @@ class _ComplaintsTable extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _formatCoordinates(String address) {
+    final regExp = RegExp(r'GPS:\s*(\-?\d+\.\d+),\s*(\-?\d+\.\d+)');
+    final match = regExp.firstMatch(address);
+    if (match != null) {
+      return '${double.parse(match.group(1)!).toStringAsFixed(6)}, ${double.parse(match.group(2)!).toStringAsFixed(6)}';
+    }
+    final regExpDirect = RegExp(r'(\-?\d+\.\d+),\s*(\-?\d+\.\d+)');
+    final matchDirect = regExpDirect.firstMatch(address);
+    if (matchDirect != null) {
+      return '${double.parse(matchDirect.group(1)!).toStringAsFixed(6)}, ${double.parse(matchDirect.group(2)!).toStringAsFixed(6)}';
+    }
+    return 'No GPS Coordinates';
+  }
+
+  String _formatAddress(String address) {
+    var clean = address;
+    final regExp = RegExp(r'GPS:\s*(\-?\d+\.\d+),\s*(\-?\d+\.\d+)');
+    clean = clean.replaceAll(regExp, '').trim();
+    final regExpDirect = RegExp(r'(\-?\d+\.\d+),\s*(\-?\d+\.\d+)');
+    clean = clean.replaceAll(regExpDirect, '').trim();
+    clean = clean.replaceAll(RegExp(r'^[\s,|:-]+|[\s,|:-]+$'), '').trim();
+    if (clean.isEmpty) {
+      if (address.contains('GPS:')) {
+        return 'Located via GPS';
+      }
+      return 'No Address Provided';
+    }
+    return clean;
   }
 }
