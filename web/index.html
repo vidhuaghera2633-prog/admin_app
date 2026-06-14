@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="TechServe Admin Dashboard">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="TechServe Admin">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>TechServe Admin</title>
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Google Maps JavaScript API -->
+  <!-- Replace YOUR_API_KEY with your actual Google Maps API key -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY"></script>
+  <script>
+    function playNotificationSound() {
+      try {
+        var context = new (window.AudioContext || window.webkitAudioContext)();
+        if (context.state === 'suspended') {
+          context.resume();
+        }
+        var osc = context.createOscillator();
+        var gain = context.createGain();
+        
+        // Beautiful modern dual-tone electronic synthesizer chime
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, context.currentTime); // D5
+        osc.frequency.exponentialRampToValueAtTime(880.00, context.currentTime + 0.12); // A5
+        
+        gain.gain.setValueAtTime(0.2, context.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.5);
+        
+        osc.connect(gain);
+        gain.connect(context.destination);
+        
+        osc.start();
+        osc.stop(context.currentTime + 0.5);
+      } catch (e) {
+        console.warn('AudioContext failed:', e);
+      }
+    }
+    // Request notification permission (returns a Promise)
+    function requestNotificationPermission() {
+      try {
+        if (!('Notification' in window)) return 'unsupported';
+        return Notification.requestPermission();
+      } catch (e) {
+        console.warn('Notification permission request failed', e);
+        return 'denied';
+      }
+    }
+
+    // Show a browser native notification. `options` should be a plain object compatible with the Notification API.
+    function showBrowserNotification(title, options) {
+      try {
+        if (!('Notification' in window)) return;
+        if (Notification.permission === 'granted') {
+          var n = new Notification(title, options || {});
+          n.onclick = function (ev) {
+            try {
+              window.focus();
+              if (options && options.data && options.data.url) {
+                window.location.href = options.data.url;
+              }
+            } catch (e) {}
+          };
+        }
+      } catch (e) {
+        console.warn('showBrowserNotification failed', e);
+      }
+    }
+  </script>
+</head>
+<body>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
