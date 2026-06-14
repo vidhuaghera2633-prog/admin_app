@@ -324,7 +324,7 @@ class _DeviceDonut extends StatelessWidget {
                 centerSpaceRadius: 40,
                 sections: data.asMap().entries.map((e) => PieChartSectionData(
                   value: (e.value['count'] as int).toDouble(),
-                  color: _colors[e.key],
+                  color: _colors[e.key % _colors.length],
                   radius: 50,
                   showTitle: false,
                 )).toList(),
@@ -336,7 +336,7 @@ class _DeviceDonut extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 6),
             child: Row(children: [
               Container(width: 10, height: 10,
-                  decoration: BoxDecoration(color: _colors[e.key], shape: BoxShape.circle)),
+                  decoration: BoxDecoration(color: _colors[e.key % _colors.length], shape: BoxShape.circle)),
               const SizedBox(width: 8),
               Expanded(child: Text(e.value['name'] as String,
                   style: const TextStyle(fontSize: 12, color: AppColors.gray600))),
